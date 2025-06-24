@@ -550,3 +550,151 @@ body {
     padding: 5px 10px;
     margin: 0;
 }
+
+    .doctor-card {
+        border: 1px solid #e1e5e9;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .doctor-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .doctor-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #f1f2f6;
+    }
+
+    .doctor-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        margin-right: 15px;
+    }
+
+    .doctor-info h3 {
+        margin: 0 0 5px 0;
+        color: #2d3436;
+    }
+
+    .specialization {
+        color: #74b9ff;
+        font-weight: 600;
+        margin: 0 0 5px 0;
+    }
+
+    .license {
+        color: #636e72;
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .doctor-contact {
+        margin-bottom: 20px;
+    }
+
+    .contact-item {
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #636e72;
+    }
+
+    .contact-item strong {
+        color: #2d3436;
+    }
+
+    .doctor-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn-full {
+        width: 100%;
+    }
+
+    .specialization-card {
+        text-align: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+    }
+
+    .specialization-card h4 {
+        margin: 0 0 10px 0;
+        color: #2d3436;
+    }
+
+    .specialization-card p {
+        margin: 0 0 15px 0;
+        color: #636e72;
+    }
+
+    .search-form .grid {
+        gap: 20px;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+
+    .modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #e1e5e9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid #e1e5e9;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .close {
+        font-size: 24px;
+        cursor: pointer;
+        color: #636e72;
+    }
+
+    .close:hover {
+        color: #2d3436;
+    }
