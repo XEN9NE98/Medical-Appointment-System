@@ -71,29 +71,29 @@ $count_stmt->execute($params);
 $total_appointments = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
 $total_pages = ceil($total_appointments / $per_page);
 
-// Get appointments
+// Get appointments - concatenate LIMIT/OFFSET directly
+$per_page = (int)$per_page;
+$offset = (int)$offset;
+
 $query = "SELECT a.*, d.name as doctor_name, d.specialization, d.phone as doctor_phone 
           FROM appointments a 
           JOIN doctors d ON a.doctor_id = d.id 
           WHERE " . $where_clause . "
           ORDER BY a.appointment_date DESC, a.appointment_time DESC 
-          LIMIT ? OFFSET ?";
-
-$params[] = $per_page;
-$params[] = $offset;
+          LIMIT $per_page OFFSET $offset";
 
 $stmt = $db->prepare($query);
-$stmt->execute($params);
+$stmt->execute($params);  // Don't add per_page and offset to params
 $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get appointment statistics for current filters
+// Get appointment statistics for current patient (not filtered)
 $stats_query = "SELECT 
     COUNT(*) as total,
     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
-    FROM appointments a WHERE a.patient_id = ?";
+    FROM appointments WHERE patient_id = ?";
 $stats_stmt = $db->prepare($stats_query);
 $stats_stmt->execute([$_SESSION['user_id']]);
 $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
@@ -150,23 +150,23 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         <!-- Statistics -->
         <div class="grid grid-5">
             <div class="stats-card">
-                <div class="stats-number"><?php echo $stats['total']; ?></div>
+                <div class="stats-number"><?php echo $stats['total'] ?? 0; ?></div>
                 <div class="stats-label">Total</div>
             </div>
             <div class="stats-card">
-                <div class="stats-number"><?php echo $stats['pending']; ?></div>
+                <div class="stats-number"><?php echo $stats['pending'] ?? 0; ?></div>
                 <div class="stats-label">Pending</div>
             </div>
             <div class="stats-card">
-                <div class="stats-number"><?php echo $stats['approved']; ?></div>
+                <div class="stats-number"><?php echo $stats['approved'] ?? 0; ?></div>
                 <div class="stats-label">Approved</div>
             </div>
             <div class="stats-card">
-                <div class="stats-number"><?php echo $stats['completed']; ?></div>
+                <div class="stats-number"><?php echo $stats['completed'] ?? 0; ?></div>
                 <div class="stats-label">Completed</div>
             </div>
             <div class="stats-card">
-                <div class="stats-number"><?php echo $stats['cancelled']; ?></div>
+                <div class="stats-number"><?php echo $stats['cancelled'] ?? 0; ?></div>
                 <div class="stats-label">Cancelled</div>
             </div>
         </div>
@@ -265,18 +265,16 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <td>
                                     <strong><?php echo htmlspecialchars($apt['doctor_name']); ?></strong><br>
                                     <small><?php echo htmlspecialchars($apt['specialization']); ?></small><br>
-                                    <small>📞 <?php echo htmlspecialchars($apt['doctor_phone']); ?></small>
+                                    <small>📞 <?php echo htmlspecialchars($apt['doctor_phone'] ?? 'N/A'); ?></small>
                                 </td>
-                                <td>
-                                    <div style="max-width: 200px;">
-                                        <?php 
-                                        $symptoms = htmlspecialchars($apt['symptoms']);
-                                        echo strlen($symptoms) > 100 ? substr($symptoms, 0, 100) . '...' : $symptoms;
-                                        ?>
-                                        <?php if (strlen($symptoms) > 100): ?>
-                                            <br><a href="#" onclick="showFullSymptoms('<?php echo $apt['id']; ?>')" style="color: #667eea; font-size: 0.9rem;">Read more</a>
-                                        <?php endif; ?>
-                                    </div>
+                                <td class="symptoms-cell">
+                                    <?php 
+                                    $symptoms = htmlspecialchars($apt['symptoms'] ?? 'No symptoms provided');
+                                    echo strlen($symptoms) > 100 ? substr($symptoms, 0, 100) . '...' : $symptoms;
+                                    ?>
+                                    <?php if (strlen($symptoms) > 100): ?>
+                                        <br><a href="#" onclick="showFullSymptoms('<?php echo $apt['id']; ?>')" style="color: #667eea; font-size: 0.9rem;">Read more</a>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <span class="status-badge status-<?php echo $apt['status']; ?>">
@@ -289,7 +287,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <div class="d-flex gap-10" style="flex-direction: column;">
+                                    <div class="action-buttons">
                                         <?php
                                         $appointment_datetime = strtotime($apt['appointment_date'] . ' ' . $apt['appointment_time']);
                                         $can_cancel = ($apt['status'] == 'pending' || $apt['status'] == 'approved') && 
@@ -297,7 +295,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         ?>
                                         
                                         <button onclick="viewAppointment(<?php echo $apt['id']; ?>)" 
-                                                class="btn btn-info" style="font-size: 0.8rem; padding: 5px 10px;">
+                                                class="btn btn-info">
                                             View Details
                                         </button>
                                         
@@ -306,7 +304,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                                   onsubmit="return confirm('Are you sure you want to cancel this appointment?')">
                                                 <input type="hidden" name="appointment_id" value="<?php echo $apt['id']; ?>">
                                                 <button type="submit" name="cancel_appointment" 
-                                                        class="btn btn-danger" style="font-size: 0.8rem; padding: 5px 10px;">
+                                                        class="btn btn-danger">
                                                     Cancel
                                                 </button>
                                             </form>
@@ -314,7 +312,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         
                                         <?php if ($apt['status'] === 'completed'): ?>
                                             <button onclick="downloadReport(<?php echo $apt['id']; ?>)" 
-                                                    class="btn btn-success" style="font-size: 0.8rem; padding: 5px 10px;">
+                                                    class="btn btn-success">
                                                 Get Report
                                             </button>
                                         <?php endif; ?>
@@ -324,7 +322,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
                             <!-- Hidden full symptoms for modal -->
                             <div id="symptoms-<?php echo $apt['id']; ?>" style="display: none;">
-                                <?php echo htmlspecialchars($apt['symptoms']); ?>
+                                <?php echo htmlspecialchars($apt['symptoms'] ?? 'No symptoms provided'); ?>
                             </div>
                             <?php endforeach; ?>
                         </tbody>
@@ -333,11 +331,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
                 <!-- Pagination -->
                 <?php if ($total_pages > 1): ?>
-                <div class="pagination" style="text-align: center; margin-top: 20px;">
+                <div class="pagination">
                     <?php
                     $base_url = "appointments.php?";
-                    if ($status_filter !== 'all') $base_url .= "status=" . $status_filter . "&";
-                    if ($date_filter !== 'all') $base_url .= "date=" . $date_filter . "&";
+                    if ($status_filter !== 'all') $base_url .= "status=" . urlencode($status_filter) . "&";
+                    if ($date_filter !== 'all') $base_url .= "date=" . urlencode($date_filter) . "&";
                     ?>
                     
                     <?php if ($page > 1): ?>
@@ -397,36 +395,52 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
     <script>
         function viewAppointment(appointmentId) {
-            // Find the appointment data from the table
-            const rows = document.querySelectorAll('table tbody tr');
-            for (let row of rows) {
-                if (row.innerHTML.includes('appointment_id" value="' + appointmentId)) {
-                    const cells = row.cells;
-                    const dateTime = cells[0].innerHTML;
-                    const doctor = cells[1].innerHTML;
-                    const symptoms = document.getElementById('symptoms-' + appointmentId).innerHTML;
-                    const status = cells[3].innerHTML;
-                    
-                    document.getElementById('modalContent').innerHTML = `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Date & Time:</strong><br>
-                            ${dateTime}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Doctor:</strong><br>
-                            ${doctor}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Status:</strong><br>
-                            ${status}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Symptoms/Reason:</strong><br>
-                            ${symptoms}
-                        </div>
-                    `;
-                    break;
-                }
+            // Get appointment data using PHP-generated JavaScript
+            const appointments = <?php echo json_encode($appointments); ?>;
+            const appointment = appointments.find(apt => apt.id == appointmentId);
+            
+            if (appointment) {
+                const dateTime = new Date(appointment.appointment_date + ' ' + appointment.appointment_time);
+                const formattedDate = dateTime.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                const formattedTime = dateTime.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    hour12: true 
+                });
+                
+                document.getElementById('modalContent').innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>Date:</strong><br>
+                        ${formattedDate}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Time:</strong><br>
+                        ${formattedTime}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Doctor:</strong><br>
+                        ${appointment.doctor_name}<br>
+                        <small>${appointment.specialization}</small>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Status:</strong><br>
+                        <span class="status-badge status-${appointment.status}">${appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}</span>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Symptoms/Reason:</strong><br>
+                        ${appointment.symptoms || 'No symptoms provided'}
+                    </div>
+                    ${appointment.medical_notes ? `
+                    <div style="margin-bottom: 15px;">
+                        <strong>Medical Notes:</strong><br>
+                        ${appointment.medical_notes}
+                    </div>
+                    ` : ''}
+                `;
             }
             
             document.getElementById('appointmentModal').style.display = 'block';
@@ -437,8 +451,10 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         }
         
         function showFullSymptoms(appointmentId) {
-            const symptoms = document.getElementById('symptoms-' + appointmentId).innerHTML;
-            alert(symptoms);
+            const symptomsElement = document.getElementById('symptoms-' + appointmentId);
+            if (symptomsElement) {
+                alert(symptomsElement.innerHTML);
+            }
         }
         
         function exportAppointments() {
@@ -448,9 +464,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             <?php foreach ($appointments as $apt): ?>
             csv += '"<?php echo date('Y-m-d', strtotime($apt['appointment_date'])); ?>",';
             csv += '"<?php echo date('H:i', strtotime($apt['appointment_time'])); ?>",';
-            csv += '"<?php echo htmlspecialchars($apt['doctor_name']); ?>",';
-            csv += '"<?php echo htmlspecialchars($apt['specialization']); ?>",';
-            csv += '"<?php echo str_replace('"', '""', htmlspecialchars($apt['symptoms'])); ?>",';
+            csv += '"<?php echo htmlspecialchars($apt['doctor_name'], ENT_QUOTES); ?>",';
+            csv += '"<?php echo htmlspecialchars($apt['specialization'], ENT_QUOTES); ?>",';
+            csv += '"<?php echo htmlspecialchars($apt['symptoms'] ?? 'No symptoms provided', ENT_QUOTES); ?>",';
             csv += '"<?php echo $apt['status']; ?>"\n';
             <?php endforeach; ?>
             
@@ -459,7 +475,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'my_appointments_<?php echo date('Y-m-d'); ?>.csv';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         }
         
@@ -476,42 +494,10 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         
         // Auto-refresh page every 5 minutes to update appointment status
         setInterval(function() {
-            if (document.hidden === false) {
+            if (!document.hidden) {
                 location.reload();
             }
         }, 300000); // 5 minutes
     </script>
-
-    <style>
-        .grid-5 {
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        }
-        
-        @media print {
-            .header, .btn, form, .pagination {
-                display: none !important;
-            }
-            
-            .card {
-                box-shadow: none !important;
-                border: 1px solid #ccc;
-            }
-            
-            body {
-                background: white !important;
-            }
-        }
-        
-        .pagination {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
-        .stats-card:hover {
-            cursor: pointer;
-        }
-    </style>
 </body>
 </html>
