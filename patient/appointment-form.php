@@ -60,7 +60,7 @@ if ($_POST) {
     <!-- Header -->
     <div class="header">
         <div class="header-content">
-            <a href="home.php" class="logo">🏥 MedSystem</a>
+            <a href="home.php" class="logo">MedSystem</a>
             <nav>
                 <ul class="nav-menu">
                     <li><a href="home.php">Home</a></li>
