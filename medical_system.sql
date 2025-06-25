@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 25, 2025 at 12:11 AM
+-- Generation Time: Jun 25, 2025 at 09:43 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -34,10 +34,19 @@ CREATE TABLE `appointments` (
   `appointment_date` date NOT NULL,
   `appointment_time` time NOT NULL,
   `symptoms` text DEFAULT NULL,
+  `reason` text DEFAULT NULL,
   `status` enum('pending','approved','completed','cancelled') DEFAULT 'pending',
   `medical_notes` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `appointments`
+--
+
+INSERT INTO `appointments` (`id`, `patient_id`, `doctor_id`, `appointment_date`, `appointment_time`, `symptoms`, `reason`, `status`, `medical_notes`, `notes`, `created_at`) VALUES
+(1, 1, 4, '2025-06-27', '11:30:00', 'Uhuk Uhuk Uhuk Uhuk Uhuk', NULL, 'pending', NULL, NULL, '2025-06-25 07:21:56');
 
 -- --------------------------------------------------------
 
@@ -65,6 +74,26 @@ INSERT INTO `doctors` (`id`, `name`, `email`, `password`, `phone`, `specializati
 (2, 'Dr. Sarah Johnson', 'sarah@hospital.com', '482c811da5d5b4bc6d497ffa98491e38', '555-0102', 'Dermatology', 'DOC002', '2025-06-24 19:46:58'),
 (3, 'Dr. Michael Brown', 'michael@hospital.com', '482c811da5d5b4bc6d497ffa98491e38', '555-0103', 'Pediatrics', 'DOC003', '2025-06-24 19:46:58'),
 (4, 'admin', 'admin@email.com', '21232f297a57a5a743894a0e4a801fc3', '0123456789', 'Cardiology', 'A123456789', '2025-06-24 20:37:15');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `medical_records`
+--
+
+CREATE TABLE `medical_records` (
+  `id` int(11) NOT NULL,
+  `patient_id` int(11) NOT NULL,
+  `appointment_id` int(11) DEFAULT NULL,
+  `doctor_id` int(11) NOT NULL,
+  `record_type` varchar(100) DEFAULT 'General Record',
+  `diagnosis` text DEFAULT NULL,
+  `treatment` text DEFAULT NULL,
+  `prescription` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -111,6 +140,15 @@ ALTER TABLE `doctors`
   ADD UNIQUE KEY `email` (`email`);
 
 --
+-- Indexes for table `medical_records`
+--
+ALTER TABLE `medical_records`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `patient_id` (`patient_id`),
+  ADD KEY `appointment_id` (`appointment_id`),
+  ADD KEY `doctor_id` (`doctor_id`);
+
+--
 -- Indexes for table `patients`
 --
 ALTER TABLE `patients`
@@ -125,13 +163,19 @@ ALTER TABLE `patients`
 -- AUTO_INCREMENT for table `appointments`
 --
 ALTER TABLE `appointments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `doctors`
 --
 ALTER TABLE `doctors`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `medical_records`
+--
+ALTER TABLE `medical_records`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `patients`
@@ -149,6 +193,14 @@ ALTER TABLE `patients`
 ALTER TABLE `appointments`
   ADD CONSTRAINT `appointments_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`),
   ADD CONSTRAINT `appointments_ibfk_2` FOREIGN KEY (`doctor_id`) REFERENCES `doctors` (`id`);
+
+--
+-- Constraints for table `medical_records`
+--
+ALTER TABLE `medical_records`
+  ADD CONSTRAINT `medical_records_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `medical_records_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `medical_records_ibfk_3` FOREIGN KEY (`doctor_id`) REFERENCES `doctors` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
