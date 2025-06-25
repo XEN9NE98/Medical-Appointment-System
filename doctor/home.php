@@ -98,7 +98,7 @@ function calculateAge($birthDate) {
             <a href="home.php" class="logo">MedSystem</a>
             <nav>
                 <ul class="nav-menu">
-                    <li><a href="home.php" class="active">Dashboard</a></li>
+                    <li><a href="home.php" class="active">Home</a></li>
                     <li><a href="appointments.php">All Appointments</a></li>
                     <li><a href="patients.php">My Patients</a></li>
                     <li><a href="schedule.php">Schedule</a></li>
