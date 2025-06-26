@@ -7,32 +7,67 @@ requireUserType('doctor');
 
 $database = new Database();
 $db = $database->getConnection();
-$appointment = new Appointment($db);
 
 // Handle appointment status updates
 if ($_POST && isset($_POST['action'])) {
     $appointment_id = $_POST['appointment_id'];
     $action = $_POST['action'];
     
-    if ($action === 'approve') {
-        $appointment->updateStatus($appointment_id, 'approved');
-        $success_message = "Appointment approved successfully!";
-    } elseif ($action === 'complete') {
-        $appointment->updateStatus($appointment_id, 'completed');
-        $success_message = "Appointment marked as completed!";
-    } elseif ($action === 'cancel') {
-        $appointment->updateStatus($appointment_id, 'cancelled');
-        $success_message = "Appointment cancelled!";
-    } elseif ($action === 'add_notes') {
-        $notes = $_POST['medical_notes'];
-        $query = "UPDATE appointments SET medical_notes = ? WHERE id = ?";
-        $stmt = $db->prepare($query);
-        $stmt->execute([$notes, $appointment_id]);
-        $success_message = "Medical notes added successfully!";
+    try {
+        if ($action === 'approve') {
+            // Direct SQL update instead of using undefined updateStatus method
+            $query = "UPDATE appointments SET status = 'approved' WHERE id = ? AND doctor_id = ?";
+            $stmt = $db->prepare($query);
+            $result = $stmt->execute([$appointment_id, $_SESSION['user_id']]);
+            
+            if ($result && $stmt->rowCount() > 0) {
+                $success_message = "Appointment approved successfully!";
+            } else {
+                $error_message = "Failed to approve appointment. Please try again.";
+            }
+        } elseif ($action === 'complete') {
+            $query = "UPDATE appointments SET status = 'completed' WHERE id = ? AND doctor_id = ?";
+            $stmt = $db->prepare($query);
+            $result = $stmt->execute([$appointment_id, $_SESSION['user_id']]);
+            
+            if ($result && $stmt->rowCount() > 0) {
+                $success_message = "Appointment marked as completed!";
+            } else {
+                $error_message = "Failed to complete appointment. Please try again.";
+            }
+        } elseif ($action === 'cancel') {
+            $query = "UPDATE appointments SET status = 'cancelled' WHERE id = ? AND doctor_id = ?";
+            $stmt = $db->prepare($query);
+            $result = $stmt->execute([$appointment_id, $_SESSION['user_id']]);
+            
+            if ($result && $stmt->rowCount() > 0) {
+                $success_message = "Appointment cancelled!";
+            } else {
+                $error_message = "Failed to cancel appointment. Please try again.";
+            }
+        } elseif ($action === 'add_notes') {
+            $notes = $_POST['medical_notes'];
+            $query = "UPDATE appointments SET medical_notes = ? WHERE id = ? AND doctor_id = ?";
+            $stmt = $db->prepare($query);
+            $result = $stmt->execute([$notes, $appointment_id, $_SESSION['user_id']]);
+            
+            if ($result && $stmt->rowCount() > 0) {
+                $success_message = "Medical notes added successfully!";
+            } else {
+                $error_message = "Failed to add medical notes. Please try again.";
+            }
+        }
+    } catch (PDOException $e) {
+        $error_message = "Database error: " . $e->getMessage();
+        error_log("Appointment update error: " . $e->getMessage());
     }
     
     // Refresh the page to show updated data
-    header('Location: appointments.php' . (isset($_GET['filter']) ? '?filter=' . $_GET['filter'] : ''));
+    $redirect_url = 'appointments.php';
+    if (isset($_GET['filter'])) {
+        $redirect_url .= '?filter=' . urlencode($_GET['filter']);
+    }
+    header('Location: ' . $redirect_url);
     exit();
 }
 
@@ -70,44 +105,60 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
-$query = "SELECT a.*, p.name as patient_name, p.phone as patient_phone, p.gender, p.date_of_birth, p.address
-          FROM appointments a 
-          JOIN patients p ON a.patient_id = p.id 
-          WHERE $where_clause
-          ORDER BY a.appointment_date DESC, a.appointment_time DESC
-          LIMIT $limit OFFSET $offset";
+try {
+    $query = "SELECT a.*, p.name as patient_name, p.phone as patient_phone, p.gender, p.date_of_birth, p.address
+              FROM appointments a 
+              JOIN patients p ON a.patient_id = p.id 
+              WHERE $where_clause
+              ORDER BY a.appointment_date DESC, a.appointment_time DESC
+              LIMIT $limit OFFSET $offset";
 
-$stmt = $db->prepare($query);
-$stmt->execute($params);
-$appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get total count for pagination
-$count_query = "SELECT COUNT(*) as total FROM appointments a 
-                JOIN patients p ON a.patient_id = p.id 
-                WHERE $where_clause";
-$count_stmt = $db->prepare($count_query);
-$count_stmt->execute($params);
-$total_appointments = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
-$total_pages = ceil($total_appointments / $limit);
+    // Get total count for pagination
+    $count_query = "SELECT COUNT(*) as total FROM appointments a 
+                    JOIN patients p ON a.patient_id = p.id 
+                    WHERE $where_clause";
+    $count_stmt = $db->prepare($count_query);
+    $count_stmt->execute($params);
+    $total_appointments = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    $total_pages = ceil($total_appointments / $limit);
 
-// Get appointment statistics
-$stats_query = "SELECT 
-    COUNT(*) as total,
-    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-    SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
-    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
-    FROM appointments WHERE doctor_id = ?";
-$stats_stmt = $db->prepare($stats_query);
-$stats_stmt->execute([$_SESSION['user_id']]);
-$stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+    // Get appointment statistics
+    $stats_query = "SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+        FROM appointments WHERE doctor_id = ?";
+    $stats_stmt = $db->prepare($stats_query);
+    $stats_stmt->execute([$_SESSION['user_id']]);
+    $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    $error_message = "Database error: " . $e->getMessage();
+    error_log("Database query error: " . $e->getMessage());
+    
+    // Set default values if query fails
+    $appointments = [];
+    $total_appointments = 0;
+    $total_pages = 0;
+    $stats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'completed' => 0, 'cancelled' => 0];
+}
 
 // Calculate patient age function
 function calculateAge($birthDate) {
     if (!$birthDate) return 'N/A';
-    $today = new DateTime();
-    $age = $today->diff(new DateTime($birthDate));
-    return $age->y;
+    try {
+        $today = new DateTime();
+        $age = $today->diff(new DateTime($birthDate));
+        return $age->y;
+    } catch (Exception $e) {
+        return 'N/A';
+    }
 }
 
 // Get status color
@@ -159,6 +210,9 @@ function getStatusColor($status) {
             <p>Manage and track all your patient appointments</p>
             <?php if (isset($success_message)): ?>
                 <div class="alert alert-success">✅ <?php echo $success_message; ?></div>
+            <?php endif; ?>
+            <?php if (isset($error_message)): ?>
+                <div class="alert alert-error">❌ <?php echo $error_message; ?></div>
             <?php endif; ?>
         </div>
 
@@ -306,38 +360,37 @@ function getStatusColor($status) {
                                 <td>
                                     <div class="action-buttons">
                                         <?php if ($apt['status'] === 'pending'): ?>
-                                            <form method="POST" style="display: inline;">
+                                            <form method="POST" style="display: inline;" onsubmit="return confirmAction('approve')">
                                                 <input type="hidden" name="appointment_id" value="<?php echo $apt['id']; ?>">
                                                 <button type="submit" name="action" value="approve" class="btn btn-success">
                                                     ✓ Approve
                                                 </button>
                                             </form>
-                                            <form method="POST" style="display: inline;">
+                                            <form method="POST" style="display: inline;" onsubmit="return confirmAction('cancel')">
                                                 <input type="hidden" name="appointment_id" value="<?php echo $apt['id']; ?>">
-                                                <button type="submit" name="action" value="cancel" class="btn btn-danger" 
-                                                        onclick="return confirm('Cancel this appointment?')">
+                                                <button type="submit" name="action" value="cancel" class="btn btn-danger">
                                                     ✗ Cancel
                                                 </button>
                                             </form>
                                         <?php elseif ($apt['status'] === 'approved'): ?>
-                                            <form method="POST" style="display: inline;">
+                                            <form method="POST" style="display: inline;" onsubmit="return confirmAction('complete')">
                                                 <input type="hidden" name="appointment_id" value="<?php echo $apt['id']; ?>">
                                                 <button type="submit" name="action" value="complete" class="btn btn-info">
                                                     ✓ Complete
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-warning" onclick="showNotesModal(<?php echo $apt['id']; ?>, '<?php echo htmlspecialchars($apt['medical_notes'] ?? ''); ?>')">
+                                            <button type="button" class="btn btn-warning" onclick="showNotesModal(<?php echo $apt['id']; ?>, '<?php echo htmlspecialchars($apt['medical_notes'] ?? '', ENT_QUOTES); ?>')">
                                                 📝 Notes
                                             </button>
                                         <?php elseif ($apt['status'] === 'completed'): ?>
-                                            <button type="button" class="btn btn-info" onclick="showNotesModal(<?php echo $apt['id']; ?>, '<?php echo htmlspecialchars($apt['medical_notes'] ?? ''); ?>')">
+                                            <button type="button" class="btn btn-info" onclick="showNotesModal(<?php echo $apt['id']; ?>, '<?php echo htmlspecialchars($apt['medical_notes'] ?? '', ENT_QUOTES); ?>')">
                                                 📝 Notes
                                             </button>
                                         <?php else: ?>
                                             <span style="color: #666; font-size: 0.8rem;">No actions</span>
                                         <?php endif; ?>
                                         
-                                        <button type="button" class="btn btn-secondary" onclick="showPatientDetails(<?php echo htmlspecialchars(json_encode($apt)); ?>)">
+                                        <button type="button" class="btn btn-secondary" onclick="showPatientDetails(<?php echo htmlspecialchars(json_encode($apt), ENT_QUOTES); ?>)">
                                             👤 Details
                                         </button>
                                     </div>
@@ -409,6 +462,15 @@ function getStatusColor($status) {
     </div>
 
     <script>
+        function confirmAction(action) {
+            const messages = {
+                'approve': 'Are you sure you want to approve this appointment?',
+                'complete': 'Are you sure you want to mark this appointment as completed?',
+                'cancel': 'Are you sure you want to cancel this appointment? This action cannot be undone.'
+            };
+            return confirm(messages[action] || 'Are you sure you want to perform this action?');
+        }
+
         function showNotesModal(appointmentId, currentNotes) {
             document.getElementById('notesAppointmentId').value = appointmentId;
             document.getElementById('medicalNotes').value = currentNotes;
@@ -504,34 +566,25 @@ function getStatusColor($status) {
                     button.textContent = 'Processing...';
                     button.disabled = true;
                     
-                    // Re-enable after 3 seconds in case of issues
+                    // Re-enable after 5 seconds in case of issues
                     setTimeout(() => {
                         button.textContent = originalText;
                         button.disabled = false;
-                    }, 3000);
+                    }, 5000);
                 }
             });
         });
 
-        // Add confirmation for critical actions
-        document.querySelectorAll('button[value="cancel"]').forEach(button => {
-            button.addEventListener('click', function(e) {
-                if (!confirm('Are you sure you want to cancel this appointment? This action cannot be undone.')) {
-                    e.preventDefault();
-                }
-            });
-        });
-
-        // Auto-hide success messages after 5 seconds
-        const successAlert = document.querySelector('.alert-success');
-        if (successAlert) {
+        // Auto-hide success/error messages after 5 seconds
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
             setTimeout(() => {
-                successAlert.style.opacity = '0';
+                alert.style.opacity = '0';
                 setTimeout(() => {
-                    successAlert.remove();
+                    alert.remove();
                 }, 300);
             }, 5000);
-        }
+        });
     </script>
 </body>
 </html>
